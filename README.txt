@@ -1,5 +1,6 @@
 LSTM
 One hidden layer Long Short-term Memory Neural Net
+Based on Gers, Schmidhuber, Cummins’ 2000 paper, “Learning to Forget: Continual Prediction with LSTM.”
 
 Implementation by Brian Davis for CS678-Advanced Nueral Networks and Machine Learning
 
