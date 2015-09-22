@@ -16,6 +16,7 @@ LSTM::LSTM(int numOfInputNodes, int numOfOutputNodes, int numOfBlocks, int numOf
 	
 }
 
+//Load from a file
 LSTM::LSTM(string fileName)
 {
 	ifstream in;
@@ -164,6 +165,7 @@ LSTM::LSTM(string fileName)
 	in.close();
 }
 
+//Burning in involves running a few samples to simulate already being in a run of temporal data
 void LSTM::burnInOn(vector<vector<double>* > instances)
 {
 	for (int i=0; i<numOfInputNodes; i++)
@@ -198,7 +200,7 @@ void LSTM::init()
 	deltaCellOUT.resize(numOfBlocks);//[block][cell][block]
 	deltaCellFOR.resize(numOfBlocks);//[block][cell][block]
 	
-	
+	//Init block wieghts to random values
 	for (int block=0; block<numOfBlocks; block++)
 	{
 		weightCellOutput[block].resize(numOfCellsInBlock);//[cell][n]
@@ -252,6 +254,7 @@ void LSTM::init()
 		}
 	}
 	
+	//init input nodes to random weights
 	weightInputCell.resize(numOfInputNodes);//[n][block][cell]
 	weightInputIN.resize(numOfInputNodes);//[n][block]
 	weightInputFOR.resize(numOfInputNodes);//[n][block]
@@ -296,6 +299,8 @@ void LSTM::init()
 		}
 	}
 	
+	
+	//init (regualr) hidden nodes to random weights
 	weightHiddenCell.resize(numOfHiddenNodes);//[n][block][cell]
 	weightHiddenOutput.resize(numOfHiddenNodes);//[n][n]
 	weightHiddenHidden.resize(numOfHiddenNodes);//[n][n]
@@ -344,6 +349,7 @@ void LSTM::init()
 	}
 	//cout << "whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;
 	
+	//init bias nodes
 	weightBiasCell.resize(numOfBlocks);//[block][cell]
 	weightBiasIN.resize(numOfBlocks);//[block]
 	weightBiasOUT.resize(numOfBlocks);//[block]
@@ -381,6 +387,7 @@ void LSTM::init()
 	dHidden[1].resize(numOfHiddenNodes);//[n]
 	dOUT.resize(numOfBlocks);//[block]
 
+	//Init random values for "back in time"
 	outOutput.resize(TIME_SPAN);//[t][n]
 	outHidden.resize(TIME_SPAN);//[t][n]
 	outInput.resize(TIME_SPAN);//[t][n]
@@ -519,10 +526,9 @@ void LSTM::init()
 	}
 }
 
+//Calculates the squared error
 double LSTM::errorDifSqr(const vector<double> &result, unsigned int correctNode)
 {
-	//cout << "Guess (" << (*result)[0] << "," << (*result)[1] << "," << (*result)[2] << ")" << endl;
-	//cout << "Correct [" << correctNode << "]" << endl;
 	double sum = 0;
 	for (unsigned int i = 0; i < numOfOutputNodes; i++)
 	{
@@ -535,7 +541,6 @@ double LSTM::errorDifSqr(const vector<double> &result, unsigned int correctNode)
 			sum += pow((1 - (result)[i]),2);
 		}
 	}
-	//cout << "error is " << sum << endl;
 	return sum;
 }
 
@@ -554,11 +559,14 @@ void LSTM::train(const vector<vector<double>*> &instances, const vector<vector<d
 		double weightChange=0;
 		int k=2;
 		for (int count = k; count < epochSize; count++)
-		//for (int i = k-TRACE; i < numOfTrainingInstances; i++)
 		{
 		
 	//cout << "2 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;
+	
+			//We randomly start somewhere in the dataset and run for some set lenght of instances
 			int i = (rand() % (instances.size() - (k+runLength))) + k;
+			
+			//burn in (previous instances) for context
 			vector<vector<double>* > burnInstances;
 			for (int j = i-(k); j < i; j++)
 			{
@@ -588,7 +596,7 @@ void LSTM::train(const vector<vector<double>*> &instances, const vector<vector<d
 		weightChange /=epochSize;
 		outfile << "Round " << limit << ", error: " << error << ", weight change: "<<weightChange<< endl;
 		
-		
+		//This was to give me an idea of how it was going
 		if (limit%5==0)
 		{
 			int correctClassifications = 0;
@@ -671,6 +679,7 @@ double LSTM::test(const vector<vector<double>*> &instances)
 
 void LSTM::runOn(vector<double>*instance)
 {
+	//
 	shiftTime();
 	for (int i=0; i<numOfInputNodes; i++)
 	{
@@ -679,6 +688,8 @@ void LSTM::runOn(vector<double>*instance)
 	
 	for (int j=0; j<numOfBlocks; j++)
 	{
+	
+		//energy coming into hidden layer
 		double netOUT = 0;
 		double netIN = 0;
 		double netFOR = 0;
@@ -709,10 +720,13 @@ void LSTM::runOn(vector<double>*instance)
 		netIN += weightBiasIN[j];
 		netFOR += weightBiasFOR[j];
 		
+		//activation function
 		outOUT[t][j] = f(netOUT);
 		outIN[t][j] = f(netIN);
 		outFOR[t][j] = f(netFOR);
 		
+		
+		//run through LSTM block
 		for (int v=0; v<numOfCellsInBlock; v++)
 		{
 			//netCell is object saved, called in training
@@ -762,6 +776,7 @@ void LSTM::runOn(vector<double>*instance)
 		outHidden[t][i] = f(net);
 	}
 	
+	//out
 	for (int i=0; i<numOfOutputNodes; i++)
 	{
 		double net = 0;
@@ -784,9 +799,8 @@ void LSTM::runOn(vector<double>*instance)
 
 double LSTM::trainOn(vector<double>*instance, int correctActivationNode)
 {
-//cout << "4 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;
 	runOn(instance);
-//cout << "5 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;
+	
 	//From hidden layer to output layer
 	for (int i=0; i<numOfOutputNodes; i++)
 	{
@@ -959,7 +973,7 @@ double LSTM::trainOn(vector<double>*instance, int correctActivationNode)
 		}
 		deltaBiasFOR[j] = deltaBiasFOR[j]*momentumTerm + learningRate * sumB;
 	}
-//cout << "6 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;	
+	
 	//from X to hidden node
 	for (int i=0; i<numOfHiddenNodes; i++)
 	{
@@ -995,9 +1009,9 @@ double LSTM::trainOn(vector<double>*instance, int correctActivationNode)
 		}
 		
 		deltaBiasHidden.at(i) = deltaBiasHidden.at(i)*momentumTerm + learningRate * dHidden.at(t).at(i);
-//cout << "6." <<i<<" whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;	
+	
 	}
-//cout << "7 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;	
+
 	//from X to OUT gate
 	for (int j=0; j<numOfBlocks; j++)
 	{
@@ -1044,7 +1058,7 @@ double LSTM::trainOn(vector<double>*instance, int correctActivationNode)
 		
 		deltaBiasOUT[j] = deltaBiasOUT[j]*momentumTerm + learningRate * dOUT[j];
 	}
-//cout << "8 whc[0][0] size: " << weightHiddenCell[0][0].size() <<endl;	
+
 	
 	
 	//Go through all deltas and actually update
@@ -1230,6 +1244,7 @@ double LSTM::totalWeightChange()
 	return sum;
 }
 
+//for debugging purposes
 void LSTM::checkWeightChange()
 {
 	
